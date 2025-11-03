@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import DashboardContent from "../pages/DashboardContent";
+import ViewAllSubscriptions from "../pages/ViewAllSubscriptions";
 
-function DashboardLayout({ children }) {
+function DashboardLayout() {
   const navigate = useNavigate();
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [activePage, setActivePage] = useState("dashboard");
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
@@ -33,7 +36,26 @@ function DashboardLayout({ children }) {
             &lt;
           </button>
           <ul style={styles.sidebarList}>
-            <li>View All Subscriptions</li>
+            <li
+              style={{
+                ...styles.sidebarItem,
+                backgroundColor:
+                  activePage === "dashboard" ? "#e3f2fd" : "transparent",
+              }}
+              onClick={() => setActivePage("dashboard")}
+            >
+              Dashboard Home
+            </li>
+            <li
+              style={{
+                ...styles.sidebarItem,
+                backgroundColor:
+                  activePage === "subscriptions" ? "#e3f2fd" : "transparent",
+              }}
+              onClick={() => setActivePage("subscriptions")}
+            >
+              View All Subscriptions
+            </li>
           </ul>
         </aside>
       )}
@@ -48,7 +70,11 @@ function DashboardLayout({ children }) {
 
       {/* Main Content */}
       <main style={{ ...styles.main, marginLeft: sidebarVisible ? 220 : 40 }}>
-        {children}
+        {activePage === "dashboard" ? (
+          <DashboardContent />
+        ) : (
+          <ViewAllSubscriptions />
+        )}
       </main>
     </div>
   );
@@ -123,6 +149,12 @@ const styles = {
   sidebarList: {
     listStyle: "none",
     padding: 0,
+  },
+  sidebarItem: {
+    padding: "10px",
+    cursor: "pointer",
+    borderRadius: "4px",
+    marginBottom: "5px",
   },
   main: {
     marginTop: "60px",
