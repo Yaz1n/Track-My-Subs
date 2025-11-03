@@ -247,6 +247,10 @@ async def shutdown_event():
 # ------------------------------
 # Routes
 # ------------------------------
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Subscription Manager!", "api_docs": "/docs"}
+
 @app.post("/signup")
 async def signup(user: UserSignup, db: AsyncIOMotorDatabase = Depends(get_database)):
     existing = await db["users"].find_one({"email": user.email})
@@ -385,11 +389,3 @@ async def delete_subscription(
     await db["subscriptions"].delete_one({"_id": ObjectId(subscription_id)})
     return {"message": "Subscription deleted successfully!"}
 
-# -------------------------------------------------
-# TEMPORARY: Manual trigger for testing reminders
-# -------------------------------------------------
-@app.get("/admin/trigger-reminders")
-async def trigger_reminders():
-    """Call this endpoint to run the reminder job immediately."""
-    await send_reminder_emails()
-    return {"status": "Reminder job executed – check your inbox and terminal"}
