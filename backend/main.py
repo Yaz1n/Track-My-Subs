@@ -53,6 +53,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Subscription Manager!", "api_docs": "/docs"}
+
 # ------------------------------
 # Pydantic Models
 # ------------------------------
@@ -247,9 +251,6 @@ async def shutdown_event():
 # ------------------------------
 # Routes
 # ------------------------------
-@app.get("/")
-async def root():
-    return {"message": "Welcome to Subscription Manager!", "api_docs": "/docs"}
 
 @app.post("/signup")
 async def signup(user: UserSignup, db: AsyncIOMotorDatabase = Depends(get_database)):
