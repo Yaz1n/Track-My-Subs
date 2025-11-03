@@ -1,0 +1,17 @@
+# render.yaml (ROOT of repo)
+services:
+  - type: web
+    name: subs-manager
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      SECRET_KEY:
+        generateValue: true
+      MONGODB_URL:
+        fromDatabase:
+          name: subscription-tracker
+          property: connectionString
+      
