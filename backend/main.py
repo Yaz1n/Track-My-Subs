@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Path, Body
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr, Field, condecimal
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -10,6 +10,7 @@ from jose import jwt, JWTError
 import os
 from dotenv import load_dotenv
 from typing import Optional, Literal
+from decimal import Decimal
 
 # ------------------------------
 # Load environment variables
@@ -188,3 +189,87 @@ async def list_subscriptions(
         "count": len(subscriptions),
         "subscriptions": subscriptions
     }
+# ------------------------------
+# Edit Subscription Route
+# ------------------------------
+
+@app.put("/dashboard/subscription/{subscription_id}")
+async def edit_subscription(
+    subscription_id: str,
+    updated_data: SubscriptionCreate = Body(...),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Edit an existing subscription."""
+    existing = await db["subscriptions"].find_one(
+        {"_id": ObjectId(subscription_id), "user_id": ObjectId(current_user["_id"])}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Subscription not found.")
+
+    updated_fields = updated_data.dict(exclude_unset=True)
+    updated_fields["updated_at"] = datetime.utcnow()
+
+    # ✅ Convert Decimal fields (e.g., cost) to float before saving to MongoDB
+    if "cost" in updated_fields and isinstance(updated_fields["cost"], Decimal):
+        updated_fields["cost"] = float(updated_fields["cost"])
+
+    # ✅ Handle ObjectId for category_id (if provided)
+    if "category_id" in updated_fields and updated_fields["category_id"]:
+        updated_fields["category_id"] = ObjectId(updated_fields["category_id"])
+
+    # ✅ Recalculate next billing date if cycle changed
+    if updated_fields.get("billing_cycle") and updated_fields["billing_cycle"] != existing.get("billing_cycle"):
+        cycle = updated_fields["billing_cycle"]
+        if cycle == "monthly":
+            updated_fields["next_billing_date"] = datetime.utcnow() + timedelta(days=30)
+        elif cycle == "yearly":
+            updated_fields["next_billing_date"] = datetime.utcnow() + timedelta(days=365)
+        elif cycle == "custom" and updated_fields.get("custom_cycle_days"):
+            updated_fields["next_billing_date"] = datetime.utcnow() + timedelta(days=updated_fields["custom_cycle_days"])
+
+    await db["subscriptions"].update_one(
+        {"_id": ObjectId(subscription_id)},
+        {"$set": updated_fields}
+    )
+
+    return {
+        "message": "Subscription updated successfully!",
+        "subscription_id": subscription_id,
+        "updated_fields": updated_fields
+    }
+# ------------------------------
+# Delete Subscription Route
+# ------------------------------
+@app.delete("/dashboard/subscription/{subscription_id}")
+async def delete_subscription(
+    subscription_id: str,
+    confirm: bool = False,  # Optional confirmation flag
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Delete a subscription after confirmation."""
+    existing = await db["subscriptions"].find_one(
+        {"_id": ObjectId(subscription_id), "user_id": ObjectId(current_user["_id"])}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Subscription not found.")
+
+    # Require user confirmation
+    if not confirm:
+        return {
+            "message": "Please confirm deletion by setting ?confirm=true in the query parameters.",
+            "subscription_id": subscription_id,
+            "subscription_name": existing["name"]
+        }
+
+    # Proceed with deletion
+    result = await db["subscriptions"].delete_one({"_id": ObjectId(subscription_id)})
+    if result.deleted_count == 1:
+        return {
+            "message": "Subscription deleted successfully!",
+            "subscription_id": subscription_id,
+            "deleted_name": existing["name"]
+        }
+
+    raise HTTPException(status_code=500, detail="Failed to delete subscription. Please try again.")
