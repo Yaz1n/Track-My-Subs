@@ -11,6 +11,8 @@ import os
 from dotenv import load_dotenv
 from typing import Optional, Literal
 from decimal import Decimal
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # ------------------------------
 # Load environment variables
@@ -30,6 +32,16 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 # FastAPI App
 # ------------------------------
 app = FastAPI(title="FastAPI + MongoDB Atlas Example")
+# ------------------------------
+# CORS Middleware
+# ------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # your React app URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow POST, GET, OPTIONS, etc.
+    allow_headers=["*"],  # Allow Authorization, Content-Type, etc.
+)
 
 # ------------------------------
 # Pydantic Models
@@ -120,8 +132,91 @@ async def login(user: UserLogin, db: AsyncIOMotorDatabase = Depends(get_database
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/dashboard")
-async def dashboard(current_user: dict = Depends(get_current_user)):
-    return {"message": f"Welcome to your dashboard, {current_user['name']}!", "email": current_user["email"]}
+async def dashboard(current_user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_database)):
+    """
+    Return user info along with:
+    - total monthly and yearly spending
+    - active subscriptions count
+    - upcoming renewals (next 7 days)
+    - top 5 most expensive subscriptions with cost & % of total monthly spending
+    """
+    # Fetch all active subscriptions for this user
+    cursor = db["subscriptions"].find({
+        "user_id": ObjectId(current_user["_id"]),
+        "is_active": True
+    })
+    subscriptions = await cursor.to_list(length=None)
+
+    total_monthly = 0.0
+    total_yearly = 0.0
+    upcoming_renewals = []
+
+    today = datetime.utcnow()
+    next_7_days = today + timedelta(days=7)
+
+    # Compute totals and upcoming renewals
+    for sub in subscriptions:
+        cost = float(sub.get("cost", 0))
+        cycle = sub.get("billing_cycle")
+        next_billing_date = sub.get("next_billing_date")
+
+        # Monthly/Yearly totals
+        if cycle == "monthly":
+            total_monthly += cost
+            total_yearly += cost * 12
+        elif cycle == "yearly":
+            total_yearly += cost
+            total_monthly += cost / 12
+        elif cycle == "custom":
+            days = sub.get("custom_cycle_days", 30)
+            monthly_equivalent = cost * (30 / days)
+            yearly_equivalent = cost * (365 / days)
+            total_monthly += monthly_equivalent
+            total_yearly += yearly_equivalent
+
+        # Upcoming renewals
+        if next_billing_date and today <= next_billing_date <= next_7_days:
+            upcoming_renewals.append({
+                "name": sub.get("name"),
+                "next_billing_date": next_billing_date.isoformat(),
+                "cost": cost,
+                "billing_cycle": cycle
+            })
+
+    # Compute top 5 most expensive subscriptions (based on monthly equivalent)
+    subs_with_monthly_cost = []
+    for sub in subscriptions:
+        cost = float(sub.get("cost", 0))
+        cycle = sub.get("billing_cycle")
+        monthly_equivalent = 0.0
+        if cycle == "monthly":
+            monthly_equivalent = cost
+        elif cycle == "yearly":
+            monthly_equivalent = cost / 12
+        elif cycle == "custom":
+            days = sub.get("custom_cycle_days", 30)
+            monthly_equivalent = cost * (30 / days)
+        subs_with_monthly_cost.append({
+            "name": sub.get("name"),
+            "monthly_cost": round(monthly_equivalent, 2)
+        })
+
+    # Sort descending and take top 5
+    top_expensive = sorted(subs_with_monthly_cost, key=lambda x: x["monthly_cost"], reverse=True)[:5]
+
+    # Add percentage of total monthly spending
+    for sub in top_expensive:
+        sub["percentage_of_total"] = round((sub["monthly_cost"] / total_monthly) * 100, 2) if total_monthly > 0 else 0
+
+    return {
+        "message": f"Welcome to your dashboard, {current_user['name']}!",
+        "email": current_user["email"],
+        "total_monthly_spending": round(total_monthly, 2),
+        "total_yearly_spending": round(total_yearly, 2),
+        "active_subscriptions_count": len(subscriptions),
+        "upcoming_renewals": upcoming_renewals,
+        "most_expensive_subscriptions": top_expensive
+    }
 
 # ------------------------------
 # Add Subscription Route
