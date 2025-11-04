@@ -8,13 +8,16 @@ function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // DYNAMIC API URL
+  const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/login", {
+      const response = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
