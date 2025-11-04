@@ -20,7 +20,7 @@ import threading  # ← ADD THIS LINE
 # Load environment variables
 # ------------------------------
 load_dotenv()
-
+VERCEL_URL = os.getenv("VERCEL_URL", "https://track-my-subs-delta.vercel.app")  # Add this line after load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
@@ -45,9 +45,15 @@ app = FastAPI(title="FastAPI + MongoDB Atlas Example")
 # ------------------------------
 # CORS Middleware
 # ------------------------------
+# Get Vercel URL from env (for flexibility)
+VERCEL_URL = os.getenv("VERCEL_URL", "https://track-my-subs-delta.vercel.app")  # ← Replace with YOUR URL
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",  # Local dev
+        VERCEL_URL,               # Production frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
