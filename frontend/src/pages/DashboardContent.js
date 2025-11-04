@@ -80,7 +80,7 @@ function DashboardContent() {
     })
     .sort((a, b) => new Date(a.next_billing_date) - new Date(b.next_billing_date));
 
-  // Top 5 most expensive subscriptions (monthly equivalent)
+  // Top 5 most expensive subscriptions
   const subsWithMonthlyCost = subscriptions
     .filter(sub => sub.is_active)
     .map(sub => {
@@ -97,53 +97,60 @@ function DashboardContent() {
   return (
     <div style={styles.container}>
       {error ? (
-        <p style={styles.error}>{error}</p>
+        <p style={styles.error}>⚠️ {error}</p>
       ) : loading ? (
-        <p>Loading...</p>
+        <p style={styles.loading}>Loading your dashboard...</p>
       ) : (
         <>
-          <h2>Welcome, {userData.email}</h2>
-          <p>{userData.message}</p>
+          <h1 style={styles.title}>Welcome, {userData.email}</h1>
+          <p style={styles.subtitle}>{userData.message}</p>
 
-          {/* Row 1: Totals */}
+          {/* ---------- Stats Row ---------- */}
           <div style={styles.row}>
-            <div style={styles.card}>
+            <div style={{ ...styles.card, ...styles.cardPurple }}>
+              <div style={styles.icon}>💰</div>
               <h3>Total Monthly Spending</h3>
-              <p>${totalMonthly.toFixed(2)}</p>
+              <p style={styles.metric}>${totalMonthly.toFixed(2)}</p>
             </div>
-            <div style={styles.card}>
+
+            <div style={{ ...styles.card, ...styles.cardBlue }}>
+              <div style={styles.icon}>📆</div>
               <h3>Total Yearly Spending</h3>
-              <p>${totalYearly.toFixed(2)}</p>
+              <p style={styles.metric}>${totalYearly.toFixed(2)}</p>
             </div>
-            <div style={styles.card}>
+
+            <div style={{ ...styles.card, ...styles.cardGreen }}>
+              <div style={styles.icon}>🟢</div>
               <h3>Active Subscriptions</h3>
-              <p>{activeCount}</p>
+              <p style={styles.metric}>{activeCount}</p>
             </div>
           </div>
 
-          {/* Row 2: Upcoming renewals & Top 5 subscriptions */}
+          {/* ---------- Tables Row ---------- */}
           <div style={styles.row}>
             {/* Upcoming Renewals */}
             <div style={styles.tableCard}>
-              <h3>Upcoming Renewals (Next 7 Days)</h3>
+              <h3 style={styles.tableTitle}>🔔 Upcoming Renewals (Next 7 Days)</h3>
               {upcomingRenewals.length === 0 ? (
-                <p>No renewals in the next 7 days.</p>
+                <p style={styles.emptyState}>🎉 No renewals in the next 7 days!</p>
               ) : (
                 <table style={styles.table}>
                   <thead>
                     <tr>
                       <th>Name</th>
                       <th>Cost</th>
-                      <th>Billing Cycle</th>
-                      <th>Next Billing Date</th>
+                      <th>Cycle</th>
+                      <th>Next Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {upcomingRenewals.map(sub => (
-                      <tr key={sub._id}>
+                    {upcomingRenewals.map((sub, i) => (
+                      <tr key={sub._id} style={i % 2 === 0 ? styles.altRow : {}}>
                         <td>{sub.name}</td>
                         <td>${sub.cost}</td>
-                        <td>{sub.billing_cycle}</td>
+                        <td>
+                          <span style={styles.badge}>{sub.billing_cycle}</span>
+                        </td>
                         <td>{new Date(sub.next_billing_date).toLocaleDateString()}</td>
                       </tr>
                     ))}
@@ -152,11 +159,11 @@ function DashboardContent() {
               )}
             </div>
 
-            {/* Top 5 Most Expensive */}
+            {/* Top 5 Expensive */}
             <div style={styles.tableCard}>
-              <h3>Top 5 Most Expensive Subscriptions</h3>
+              <h3 style={styles.tableTitle}>💎 Top 5 Most Expensive Subscriptions</h3>
               {subsWithMonthlyCost.length === 0 ? (
-                <p>No subscriptions yet.</p>
+                <p style={styles.emptyState}>🪙 No subscriptions yet!</p>
               ) : (
                 <table style={styles.table}>
                   <thead>
@@ -167,11 +174,26 @@ function DashboardContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {subsWithMonthlyCost.map(sub => (
-                      <tr key={sub._id}>
+                    {subsWithMonthlyCost.map((sub, i) => (
+                      <tr key={sub._id} style={i % 2 === 0 ? styles.altRow : {}}>
                         <td>{sub.name}</td>
                         <td>${sub.monthlyEquivalent.toFixed(2)}</td>
-                        <td>{((sub.monthlyEquivalent / totalMonthly) * 100).toFixed(2)}%</td>
+                        <td style={{ width: "35%" }}>
+                          <div style={styles.progressBarContainer}>
+                            <div
+                              style={{
+                                ...styles.progressBar,
+                                width: `${(
+                                  (sub.monthlyEquivalent / totalMonthly) *
+                                  100
+                                ).toFixed(2)}%`,
+                              }}
+                            ></div>
+                          </div>
+                          <span>
+                            {((sub.monthlyEquivalent / totalMonthly) * 100).toFixed(2)}%
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -187,38 +209,108 @@ function DashboardContent() {
 
 const styles = {
   container: {
-    textAlign: "center",
-    marginTop: "50px",
-    fontFamily: "Arial, sans-serif",
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #7f00ff, #e100ff)",
+    color: "#fff",
+    padding: "60px 20px",
+    fontFamily: "'Poppins', sans-serif",
   },
-  error: {
-    color: "red",
+  title: {
+    fontSize: "2rem",
+    marginBottom: "10px",
+    fontWeight: "700",
+  },
+  subtitle: {
+    color: "#e0d7f8",
+    marginBottom: "40px",
+  },
+  loading: {
+    fontSize: "1.2rem",
   },
   row: {
     display: "flex",
     justifyContent: "center",
-    gap: "20px",
-    marginTop: "20px",
     flexWrap: "wrap",
+    gap: "25px",
+    marginTop: "30px",
   },
   card: {
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    padding: "20px",
-    width: "200px",
-    boxShadow: "0px 2px 6px rgba(0,0,0,0.1)",
+    borderRadius: "20px",
+    padding: "25px",
+    width: "260px",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
+    textAlign: "center",
+    color: "#fff",
+    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+  },
+  cardPurple: {
+    background: "linear-gradient(135deg, #9d50bb, #6e48aa)",
+  },
+  cardBlue: {
+    background: "linear-gradient(135deg, #00c6ff, #0072ff)",
+  },
+  cardGreen: {
+    background: "linear-gradient(135deg, #43e97b, #38f9d7)",
+  },
+  icon: {
+    fontSize: "2rem",
+    marginBottom: "10px",
+  },
+  metric: {
+    fontSize: "1.5rem",
+    fontWeight: "600",
   },
   tableCard: {
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    padding: "15px",
+    background: "rgba(255,255,255,0.15)",
+    backdropFilter: "blur(10px)",
+    borderRadius: "16px",
+    padding: "20px",
     width: "45%",
-    boxShadow: "0px 2px 6px rgba(0,0,0,0.1)",
+    minWidth: "350px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+  },
+  tableTitle: {
+    fontSize: "1.2rem",
+    marginBottom: "10px",
   },
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    marginTop: "10px",
+    textAlign: "left",
+    background: "transparent",
+  },
+  altRow: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  badge: {
+    display: "inline-block",
+    padding: "4px 10px",
+    borderRadius: "12px",
+    background: "rgba(255,255,255,0.25)",
+    color: "#fff",
+    fontSize: "0.85rem",
+    textTransform: "capitalize",
+  },
+  progressBarContainer: {
+    width: "100%",
+    height: "6px",
+    background: "rgba(255,255,255,0.2)",
+    borderRadius: "4px",
+    overflow: "hidden",
+    marginBottom: "4px",
+  },
+  progressBar: {
+    height: "100%",
+    background: "linear-gradient(90deg, #ff9a9e, #fad0c4)",
+  },
+  emptyState: {
+    textAlign: "center",
+    fontStyle: "italic",
+    color: "#f5e1ff",
+  },
+  error: {
+    color: "red",
+    fontWeight: "bold",
   },
 };
 
